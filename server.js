@@ -243,10 +243,17 @@ app.post('/api/bid', async (req, res) => {
   }
 });
 
-// 3. Organizer Reset / Start New Timed Auction
-app.post('/api/auction/reset', async (req, res) => {
+// 3. Organizer Create / Reset Timed Auction
+const handleCreateOrReset = async (req, res) => {
   try {
-    const { durationSeconds = 180, startingPrice = 1000 } = req.body;
+    const {
+      title,
+      description,
+      durationSeconds = 180,
+      startingPrice = 1000,
+      imageUrl,
+    } = req.body;
+
     const duration = Math.max(5, Number(durationSeconds) || 180);
     const startPrice = Math.max(1, Number(startingPrice) || 1000);
 
@@ -255,6 +262,9 @@ app.post('/api/auction/reset', async (req, res) => {
 
     memoryAuction = {
       ...DEFAULT_AUCTION,
+      id: `auction-${Date.now()}`,
+      title: title && title.trim() ? title.trim() : DEFAULT_AUCTION.title,
+      description: description && description.trim() ? description.trim() : DEFAULT_AUCTION.description,
       startingPrice: startPrice,
       currentHighestBid: startPrice,
       currentHighestBidder: null,
@@ -263,6 +273,7 @@ app.post('/api/auction/reset', async (req, res) => {
       endTime: endTime,
       status: 'ACTIVE',
       winner: null,
+      imageUrl: imageUrl && imageUrl.trim() ? imageUrl.trim() : DEFAULT_AUCTION.imageUrl,
     };
     memoryBids = [];
 
@@ -289,16 +300,20 @@ app.post('/api/auction/reset', async (req, res) => {
 
     return res.json({
       success: true,
-      message: `Auction reset successfully for ${duration} seconds.`,
+      message: `Auction for "${memoryAuction.title}" created successfully with ${duration}s countdown.`,
       auction: {
         ...memoryAuction,
         remainingSeconds: duration,
       },
+      bids: memoryBids,
     });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
-});
+};
+
+app.post('/api/auction/create', handleCreateOrReset);
+app.post('/api/auction/reset', handleCreateOrReset);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
