@@ -12,15 +12,14 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins = process.env.CLIENT_URL || '*';
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: '*',
     methods: ['GET', 'POST'],
   },
 });
 
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 // In-Memory Fallback State (ensures zero crash if MongoDB is not running locally)
@@ -142,21 +141,15 @@ app.post('/api/bid', async (req, res) => {
       });
     }
 
-    // Strict Rule: Reject bids that do not exceed the current highest bid
+    // Strict Rule: Every new bid must be at least ₹100 higher than the current highest bid
     const minRequired = memoryAuction.currentHighestBidder
-      ? memoryAuction.currentHighestBid
+      ? memoryAuction.currentHighestBid + 100
       : memoryAuction.startingPrice;
 
-    // If there's already a bid, the new bid MUST EXCEED the current highest bid
-    // If no bids yet, new bid must be at least >= starting price (or > starting price)
-    const mustBeStrictlyGreaterThan = memoryAuction.currentHighestBidder
-      ? memoryAuction.currentHighestBid
-      : memoryAuction.startingPrice - 1;
-
-    if (numericAmount <= mustBeStrictlyGreaterThan) {
+    if (numericAmount < minRequired) {
       const reason = memoryAuction.currentHighestBidder
-        ? `Bid rejected: Your bid of $${numericAmount} must exceed the current highest bid of $${memoryAuction.currentHighestBid}.`
-        : `Bid rejected: Your bid of $${numericAmount} must be at least the starting price of $${memoryAuction.startingPrice}.`;
+        ? `Bid rejected: Every new bid must be at least ₹100 higher than the current highest bid of ₹${memoryAuction.currentHighestBid.toLocaleString('en-IN')}. Minimum allowed bid is ₹${(memoryAuction.currentHighestBid + 100).toLocaleString('en-IN')}.`
+        : `Bid rejected: Your bid of ₹${numericAmount.toLocaleString('en-IN')} must be at least the starting price of ₹${memoryAuction.startingPrice.toLocaleString('en-IN')}.`;
 
       // Record rejected bid attempt for transparent history auditing
       const rejectedBid = {
@@ -231,7 +224,7 @@ app.post('/api/bid', async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `Bid of $${numericAmount} placed successfully by ${bidderName.trim()}!`,
+      message: `Bid of ₹${numericAmount.toLocaleString('en-IN')} placed successfully by ${bidderName.trim()}!`,
       bid: newBid,
       auction: {
         ...memoryAuction,
